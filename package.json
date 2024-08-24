@@ -4,6 +4,10 @@
     "name": "Gajus Kuizinas",
     "url": "http://gajus.com"
   },
+  "files": [
+    "dist",
+    "src"
+  ],
   "dependencies": {
     "@es-joy/jsdoccomment": "~0.48.0",
     "are-docs-informative": "^0.0.2",
@@ -88,18 +92,18 @@
     "*.js": "npm run lint-arg -- --fix"
   },
   "type": "module",
-  "main": "./dist/index.cjs",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./src/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./getJsdocProcessorPlugin.js": {
       "types": "./dist/getJsdocProcessorPlugin.d.ts",
-      "import": "./dist/getJsdocProcessorPlugin.cjs",
-      "require": "./src/getJsdocProcessorPlugin.js"
+      "import": "./dist/getJsdocProcessorPlugin.js",
+      "require": "./dist/getJsdocProcessorPlugin.js"
     }
   },
   "name": "eslint-plugin-jsdoc",
@@ -152,5 +156,6 @@
     "test-cov": "cross-env TIMING=1 c8 --reporter text npm run test-no-cov",
     "test-index": "npm run test-no-cov -- test/rules/index.js"
   },
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "packageManager": "pnpm@9.8.0+sha512.8e4c3550fb500e808dbc30bb0ce4dd1eb614e30b1c55245f211591ec2cdf9c611cabd34e1364b42f564bd54b3945ed0f49d61d1bbf2ec9bd74b866fcdc723276"
 }

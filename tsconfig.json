@@ -20,5 +20,5 @@
     "typings/babel__eslint-parser.d.ts",
     "src/import-worker.mjs"
   ],
-  "exclude": ["node_modules"]
+  // "exclude": ["node_modules"]
 }
