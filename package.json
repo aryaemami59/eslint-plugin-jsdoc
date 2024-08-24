@@ -92,18 +92,35 @@
     "*.js": "npm run lint-arg -- --fix"
   },
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./getJsdocProcessorPlugin.js": {
-      "types": "./dist/getJsdocProcessorPlugin.d.ts",
-      "import": "./dist/getJsdocProcessorPlugin.js",
-      "require": "./dist/getJsdocProcessorPlugin.js"
+      "import": {
+        "types": "./dist/getJsdocProcessorPlugin.d.ts",
+        "default": "./dist/getJsdocProcessorPlugin.js"
+      },
+      "require": {
+        "types": "./dist/getJsdocProcessorPlugin.d.cts",
+        "default": "./dist/getJsdocProcessorPlugin.cjs"
+      }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "getJsdocProcessorPlugin.js": [
+        "./dist/index.d.cts"
+      ]
     }
   },
   "name": "eslint-plugin-jsdoc",
@@ -140,8 +157,10 @@
   },
   "scripts": {
     "tsc": "tsc",
+    "create-file": "echo import index from './index.js';> ./dist/index.d.cts && echo.>> ./dist/index.d.cts && echo export = index;>> ./dist/index.d.cts && cp ./dist/getJsdocProcessorPlugin.d.ts ./dist/getJsdocProcessorPlugin.d.cts",
     "tsc-build": "tsc -p tsconfig-prod.json",
-    "build": "rimraf ./dist && cross-env NODE_ENV=production babel ./src --out-file-extension .cjs --out-dir ./dist --copy-files --source-maps --ignore ./src/bin/*.js --no-copy-ignored && replace 'require\\(\"\\.(.*?)\\.[^.]*?\"\\)' 'require(\".$1.cjs\")' 'dist' -r --include=\"*.cjs\" && cp src/import-worker.mjs dist/import-worker.mjs && pnpm tsc-build",
+    "build": "rimraf ./dist && cross-env NODE_ENV=production babel ./src --out-file-extension .cjs --out-dir ./dist --copy-files --source-maps --ignore ./src/bin/*.js --no-copy-ignored && pnpm replace 'require\\(\"\\.(.*?)\\.[^.]*?\"\\)' 'require(\".$1.cjs\")' 'dist' -r --include=\"*.cjs\" && cp src/import-worker.mjs dist/import-worker.mjs && pnpm tsc-build && pnpm create-file",
+    "prepack": "pnpm run build",
     "check-docs": "babel-node ./src/bin/generateDocs.js --check",
     "create-docs": "npm run create-options && babel-node ./src/bin/generateDocs.js",
     "create-rule": "babel-node ./src/bin/generateRule.js",
@@ -157,5 +176,5 @@
     "test-index": "npm run test-no-cov -- test/rules/index.js"
   },
   "version": "1.0.0",
-  "packageManager": "pnpm@9.8.0+sha512.8e4c3550fb500e808dbc30bb0ce4dd1eb614e30b1c55245f211591ec2cdf9c611cabd34e1364b42f564bd54b3945ed0f49d61d1bbf2ec9bd74b866fcdc723276"
+  "packageManager": "pnpm@9.8.0"
 }
