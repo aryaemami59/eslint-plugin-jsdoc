@@ -68,6 +68,7 @@
     "replace": "^1.2.2",
     "rimraf": "^5.0.7",
     "semantic-release": "^24.0.0",
+    "tsup": "^8.2.4",
     "typescript": "5.5.x",
     "typescript-eslint": "^8.1.0"
   },
