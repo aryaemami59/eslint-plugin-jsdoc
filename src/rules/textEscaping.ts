@@ -1,4 +1,4 @@
-import iterateJsdoc from '../iterateJsdoc.js';
+import iterateJsdoc from "../iterateJsdoc.js";
 
 // We could disallow raw gt, quot, and apos, but allow for parity; but we do
 //  not allow hex or decimal character references
@@ -9,13 +9,13 @@ const markdownRegex = /(?<!\\)(`+)([^`]+)\1(?!`)/u;
  * @param {string} desc
  * @returns {string}
  */
-const htmlReplacer = (desc) => {
-  return desc.replaceAll(new RegExp(htmlRegex, 'gu'), (_) => {
-    if (_ === '<') {
-      return '&lt;';
+const htmlReplacer = (desc: string): string => {
+  return desc.replaceAll(new RegExp(htmlRegex, "gu"), (_) => {
+    if (_ === "<") {
+      return "&lt;";
     }
 
-    return '&amp;';
+    return "&amp;";
   });
 };
 
@@ -23,124 +23,132 @@ const htmlReplacer = (desc) => {
  * @param {string} desc
  * @returns {string}
  */
-const markdownReplacer = (desc) => {
-  return desc.replaceAll(new RegExp(markdownRegex, 'gu'), (_, backticks, encapsed) => {
-    const bookend = '`'.repeat(backticks.length);
-    return `\\${bookend}${encapsed}${bookend}`;
-  });
+const markdownReplacer = (desc: string): string => {
+  return desc.replaceAll(
+    new RegExp(markdownRegex, "gu"),
+    (_, backticks, encapsed) => {
+      const bookend = "`".repeat(backticks.length);
+      return `\\${bookend}${encapsed}${bookend}`;
+    },
+  );
 };
 
-export default iterateJsdoc(({
-  context,
-  jsdoc,
-  utils,
-}) => {
-  const {
-    escapeHTML,
-    escapeMarkdown,
-  } = context.options[0] || {};
+export default iterateJsdoc(
+  ({ context, jsdoc, utils }) => {
+    const { escapeHTML, escapeMarkdown } = context.options[0] || {};
 
-  if (!escapeHTML && !escapeMarkdown) {
-    context.report({
-      loc: {
-        end: {
-          column: 1,
-          line: 1,
+    if (!escapeHTML && !escapeMarkdown) {
+      context.report({
+        loc: {
+          end: {
+            column: 1,
+            line: 1,
+          },
+          start: {
+            column: 1,
+            line: 1,
+          },
         },
-        start: {
-          column: 1,
-          line: 1,
-        },
-      },
-      message: 'You must include either `escapeHTML` or `escapeMarkdown`',
-    });
-    return;
-  }
-
-  const {
-    descriptions,
-  } = utils.getDescription();
-
-  if (escapeHTML) {
-    if (descriptions.some((desc) => {
-      return htmlRegex.test(desc);
-    })) {
-      const line = utils.setDescriptionLines(htmlRegex, htmlReplacer);
-      utils.reportJSDoc('You have unescaped HTML characters < or &', {
-        line,
-      }, () => {}, true);
+        message: "You must include either `escapeHTML` or `escapeMarkdown`",
+      });
       return;
     }
 
-    for (const tag of jsdoc.tags) {
-      if (/** @type {string[]} */ (
-        utils.getTagDescription(tag, true)
-      ).some((desc) => {
-        return htmlRegex.test(desc);
-      })) {
-        const line = utils.setTagDescription(tag, htmlRegex, htmlReplacer) +
-          tag.source[0].number;
-        utils.reportJSDoc('You have unescaped HTML characters < or & in a tag', {
-          line,
-        }, () => {}, true);
+    const { descriptions } = utils.getDescription();
+
+    if (escapeHTML) {
+      if (descriptions.some((desc: string) => htmlRegex.test(desc))) {
+        const line = utils.setDescriptionLines(htmlRegex, htmlReplacer);
+        utils.reportJSDoc(
+          "You have unescaped HTML characters < or &",
+          {
+            line,
+          },
+          () => {},
+          true,
+        );
+        return;
       }
+
+      for (const tag of jsdoc.tags) {
+        if (
+          /** @type {string[]} */ utils
+            .getTagDescription(tag, true)
+            .some((desc: string) => htmlRegex.test(desc))
+        ) {
+          const line =
+            utils.setTagDescription(tag, htmlRegex, htmlReplacer) +
+            tag.source[0].number;
+          utils.reportJSDoc(
+            "You have unescaped HTML characters < or & in a tag",
+            {
+              line,
+            },
+            () => {},
+            true,
+          );
+        }
+      }
+
+      return;
     }
 
-    return;
-  }
-
-  if (descriptions.some((desc) => {
-    return markdownRegex.test(desc);
-  })) {
-    const line = utils.setDescriptionLines(markdownRegex, markdownReplacer);
-    utils.reportJSDoc('You have unescaped Markdown backtick sequences', {
-      line,
-    }, () => {}, true);
-    return;
-  }
-
-  for (const tag of jsdoc.tags) {
-    if (/** @type {string[]} */ (
-      utils.getTagDescription(tag, true)
-    ).some((desc) => {
-      return markdownRegex.test(desc);
-    })) {
-      const line = utils.setTagDescription(
-        tag, markdownRegex, markdownReplacer,
-      ) + tag.source[0].number;
+    if (descriptions.some((desc: string) => markdownRegex.test(desc))) {
+      const line = utils.setDescriptionLines(markdownRegex, markdownReplacer);
       utils.reportJSDoc(
-        'You have unescaped Markdown backtick sequences in a tag',
+        "You have unescaped Markdown backtick sequences",
         {
           line,
         },
         () => {},
         true,
       );
+      return;
     }
-  }
-}, {
-  iterateAllJsdocs: true,
-  meta: {
-    docs: {
-      description: '',
-      url: 'https://github.com/gajus/eslint-plugin-jsdoc/blob/main/docs/rules/text-escaping.md#repos-sticky-header',
-    },
-    fixable: 'code',
-    schema: [
-      {
-        additionalProperties: false,
-        properties: {
-          // Option properties here (or remove the object)
-          escapeHTML: {
-            type: 'boolean',
+
+    for (const tag of jsdoc.tags) {
+      if (
+        /** @type {string[]} */ utils
+          .getTagDescription(tag, true)
+          .some((desc: string) => markdownRegex.test(desc))
+      ) {
+        const line =
+          utils.setTagDescription(tag, markdownRegex, markdownReplacer) +
+          tag.source[0].number;
+        utils.reportJSDoc(
+          "You have unescaped Markdown backtick sequences in a tag",
+          {
+            line,
           },
-          escapeMarkdown: {
-            type: 'boolean',
-          },
-        },
-        type: 'object',
-      },
-    ],
-    type: 'suggestion',
+          () => {},
+          true,
+        );
+      }
+    }
   },
-});
+  {
+    iterateAllJsdocs: true,
+    meta: {
+      docs: {
+        description: "",
+        url: "https://github.com/gajus/eslint-plugin-jsdoc/blob/main/docs/rules/text-escaping.md#repos-sticky-header",
+      },
+      fixable: "code",
+      schema: [
+        {
+          additionalProperties: false,
+          properties: {
+            escapeHTML: {
+              type: "boolean",
+            },
+            escapeMarkdown: {
+              type: "boolean",
+            },
+          },
+          type: "object",
+        },
+      ],
+      type: "suggestion",
+    },
+  },
+);

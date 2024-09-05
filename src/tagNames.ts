@@ -1,13 +1,14 @@
 /**
- * @typedef {{
- *   [key: string]: string[]
- * }} AliasedTags
+ * AliasedTags is an object type where keys are strings, and values are arrays of strings.
  */
+interface AliasedTags {
+  [key: string]: string[];
+}
 
 /**
- * @type {AliasedTags}
+ * Undocumented JSDoc tags.
  */
-const jsdocTagsUndocumented = {
+const jsdocTagsUndocumented: AliasedTags = {
   // Undocumented but present; see
   // https://github.com/jsdoc/jsdoc/issues/1283#issuecomment-516816802
   // https://github.com/jsdoc/jsdoc/blob/master/packages/jsdoc/lib/jsdoc/tag/dictionary/definitions.js#L594
@@ -15,66 +16,41 @@ const jsdocTagsUndocumented = {
 };
 
 /**
- * @type {AliasedTags}
+ * Documented JSDoc tags.
  */
-const jsdocTags = {
+const jsdocTags: AliasedTags = {
   ...jsdocTagsUndocumented,
-  abstract: [
-    'virtual',
-  ],
+  abstract: ["virtual"],
   access: [],
   alias: [],
   async: [],
-  augments: [
-    'extends',
-  ],
+  augments: ["extends"],
   author: [],
   borrows: [],
   callback: [],
-  class: [
-    'constructor',
-  ],
+  class: ["constructor"],
   classdesc: [],
-  constant: [
-    'const',
-  ],
+  constant: ["const"],
   constructs: [],
   copyright: [],
-  default: [
-    'defaultvalue',
-  ],
+  default: ["defaultvalue"],
   deprecated: [],
-  description: [
-    'desc',
-  ],
+  description: ["desc"],
   enum: [],
   event: [],
   example: [],
   exports: [],
-  external: [
-    'host',
-  ],
-  file: [
-    'fileoverview',
-    'overview',
-  ],
-  fires: [
-    'emits',
-  ],
-  function: [
-    'func',
-    'method',
-  ],
+  external: ["host"],
+  file: ["fileoverview", "overview"],
+  fires: ["emits"],
+  function: ["func", "method"],
   generator: [],
   global: [],
   hideconstructor: [],
   ignore: [],
   implements: [],
   inheritdoc: [],
-
-  // Allowing casing distinct from jsdoc `definitions.js` (required in Closure)
-  inheritDoc: [],
-
+  inheritDoc: [], // Allowing casing distinct from jsdoc `definitions.js` (required in Closure)
   inner: [],
   instance: [],
   interface: [],
@@ -82,58 +58,43 @@ const jsdocTags = {
   lends: [],
   license: [],
   listens: [],
-  member: [
-    'var',
-  ],
+  member: ["var"],
   memberof: [],
-  'memberof!': [],
+  "memberof!": [],
   mixes: [],
   mixin: [],
-
   module: [],
   name: [],
   namespace: [],
   override: [],
   package: [],
-  param: [
-    'arg',
-    'argument',
-  ],
+  param: ["arg", "argument"],
   private: [],
-  property: [
-    'prop',
-  ],
+  property: ["prop"],
   protected: [],
   public: [],
   readonly: [],
   requires: [],
-  returns: [
-    'return',
-  ],
+  returns: ["return"],
   see: [],
   since: [],
   static: [],
   summary: [],
-
   this: [],
-  throws: [
-    'exception',
-  ],
+  throws: ["exception"],
   todo: [],
   tutorial: [],
   type: [],
   typedef: [],
   variation: [],
   version: [],
-  yields: [
-    'yield',
-  ],
+  yields: ["yield"],
 };
 
 /**
- * @type {AliasedTags}
+ * TypeScript-specific JSDoc tags.
  */
-const typeScriptTags = {
+const typeScriptTags: AliasedTags = {
   ...jsdocTags,
 
   // https://github.com/microsoft/TypeScript/issues/22160
@@ -155,9 +116,9 @@ const typeScriptTags = {
 };
 
 /**
- * @type {AliasedTags}
+ * Closure-specific undocumented tags.
  */
-const undocumentedClosureTags = {
+const undocumentedClosureTags: AliasedTags = {
   // These are in Closure source but not in jsdoc source nor in the Closure
   //  docs: https://github.com/google/closure-compiler/blob/master/src/com/google/javascript/jscomp/parsing/Annotation.java
   closurePrimitive: [],
@@ -188,9 +149,9 @@ const {
 } = typeScriptTags;
 
 /**
- * @type {AliasedTags}
+ * Closure-specific documented tags.
  */
-const closureTags = {
+const closureTags: AliasedTags = {
   ...typeScriptTagsInClosure,
   ...undocumentedClosureTags,
 
@@ -200,7 +161,6 @@ const closureTags = {
 
   // Defined as a synonym of `const` in jsdoc `definitions.js`
   define: [],
-
   dict: [],
   export: [],
   externs: [],
@@ -221,18 +181,10 @@ const closureTags = {
   // Defined as a synonym of `interface` in jsdoc `definitions.js`
   record: [],
 
-  return: [
-    'returns',
-  ],
-
+  return: ["returns"],
   struct: [],
   suppress: [],
-
   unrestricted: [],
 };
 
-export {
-  closureTags,
-  jsdocTags,
-  typeScriptTags,
-};
+export { closureTags, jsdocTags, typeScriptTags };

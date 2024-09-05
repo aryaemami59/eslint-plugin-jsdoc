@@ -1,189 +1,199 @@
-import iterateJsdoc from '../iterateJsdoc.js';
+import iterateJsdoc from "../iterateJsdoc.js";
 
-export default iterateJsdoc(({
-  context,
-  jsdoc,
-  utils,
-  indent,
-}) => {
-  const [
-    defaultRequireValue = 'always',
-    {
-      tags: tagMap = {},
-    } = {},
-  ] = context.options;
+interface TagMap {
+  always?: string[];
+  any?: string[];
+  never?: string[];
+}
 
-  const {
-    source,
-  } = jsdoc;
+interface Options {
+  tags?: TagMap;
+}
 
-  const always = defaultRequireValue === 'always';
-  const never = defaultRequireValue === 'never';
+interface Context {
+  options: [string, Options?];
+}
 
-  /** @type {string} */
-  let currentTag;
-  source.some(({
-    number,
-    tokens,
+export default iterateJsdoc(
+  ({
+    context,
+    jsdoc,
+    utils,
+    indent,
+  }: {
+    context: Context;
+    jsdoc: any;
+    utils: any;
+    indent: string;
   }) => {
-    const {
-      delimiter,
-      tag,
-      end,
-      description,
-    } = tokens;
+    const [defaultRequireValue = "always", { tags: tagMap = {} } = {}] =
+      context.options;
 
-    /**
-     * @returns {void}
-     */
-    const neverFix = () => {
-      tokens.delimiter = '';
-      tokens.postDelimiter = '';
-    };
+    const { source } = jsdoc;
 
-    /**
-     * @param {string} checkValue
-     * @returns {boolean}
-     */
-    const checkNever = (checkValue) => {
-      if (delimiter && delimiter !== '/**' && (
-        never && !tagMap.always?.includes(checkValue) ||
-        tagMap.never?.includes(checkValue)
-      )) {
-        utils.reportJSDoc('Expected JSDoc line to have no prefix.', {
-          column: 0,
-          line: number,
-        }, neverFix);
+    const always = defaultRequireValue === "always";
+    const never = defaultRequireValue === "never";
 
-        return true;
-      }
+    let currentTag: string | undefined;
 
-      return false;
-    };
+    source.some(
+      ({
+        number,
+        tokens,
+      }: {
+        number: number;
+        tokens: {
+          delimiter: string;
+          tag: string;
+          end: boolean;
+          description: string;
+          start?: string;
+          postDelimiter?: string;
+        };
+      }) => {
+        const { delimiter, tag, end, description } = tokens;
 
-    /**
-     * @returns {void}
-     */
-    const alwaysFix = () => {
-      if (!tokens.start) {
-        tokens.start = indent + ' ';
-      }
+        const neverFix = (): void => {
+          tokens.delimiter = "";
+          tokens.postDelimiter = "";
+        };
 
-      tokens.delimiter = '*';
-      tokens.postDelimiter = tag || description ? ' ' : '';
-    };
+        const checkNever = (checkValue: string): boolean => {
+          if (
+            delimiter &&
+            delimiter !== "/**" &&
+            ((never && !tagMap.always?.includes(checkValue)) ||
+              tagMap.never?.includes(checkValue))
+          ) {
+            utils.reportJSDoc(
+              "Expected JSDoc line to have no prefix.",
+              {
+                column: 0,
+                line: number,
+              },
+              neverFix,
+            );
 
-    /**
-     * @param {string} checkValue
-     * @returns {boolean}
-     */
-    const checkAlways = (checkValue) => {
-      if (
-        !delimiter && (
-          always && !tagMap.never?.includes(checkValue) ||
-          tagMap.always?.includes(checkValue)
-        )
-      ) {
-        utils.reportJSDoc('Expected JSDoc line to have the prefix.', {
-          column: 0,
-          line: number,
-        }, alwaysFix);
+            return true;
+          }
 
-        return true;
-      }
+          return false;
+        };
 
-      return false;
-    };
+        const alwaysFix = (): void => {
+          if (!tokens.start) {
+            tokens.start = indent + " ";
+          }
 
-    if (tag) {
-      // Remove at sign
-      currentTag = tag.slice(1);
-    }
+          tokens.delimiter = "*";
+          tokens.postDelimiter = tag || description ? " " : "";
+        };
 
-    if (
-      // If this is the end but has a tag, the delimiter will also be
-      //  populated and will be safely ignored later
-      end && !tag
-    ) {
-      return false;
-    }
+        const checkAlways = (checkValue: string): boolean => {
+          if (
+            !delimiter &&
+            ((always && !tagMap.never?.includes(checkValue)) ||
+              tagMap.always?.includes(checkValue))
+          ) {
+            utils.reportJSDoc(
+              "Expected JSDoc line to have the prefix.",
+              {
+                column: 0,
+                line: number,
+              },
+              alwaysFix,
+            );
 
-    if (!currentTag) {
-      if (tagMap.any?.includes('*description')) {
+            return true;
+          }
+
+          return false;
+        };
+
+        if (tag) {
+          currentTag = tag.slice(1); // Remove at sign
+        }
+
+        if (end && !tag) {
+          return false;
+        }
+
+        if (!currentTag) {
+          if (tagMap.any?.includes("*description")) {
+            return false;
+          }
+
+          if (checkNever("*description")) {
+            return true;
+          }
+
+          if (checkAlways("*description")) {
+            return true;
+          }
+
+          return false;
+        }
+
+        if (tagMap.any?.includes(currentTag)) {
+          return false;
+        }
+
+        if (checkNever(currentTag)) {
+          return true;
+        }
+
+        if (checkAlways(currentTag)) {
+          return true;
+        }
+
         return false;
-      }
-
-      if (checkNever('*description')) {
-        return true;
-      }
-
-      if (checkAlways('*description')) {
-        return true;
-      }
-
-      return false;
-    }
-
-    if (tagMap.any?.includes(currentTag)) {
-      return false;
-    }
-
-    if (checkNever(currentTag)) {
-      return true;
-    }
-
-    if (checkAlways(currentTag)) {
-      return true;
-    }
-
-    return false;
-  });
-}, {
-  iterateAllJsdocs: true,
-  meta: {
-    docs: {
-      description:
-        'Requires that each JSDoc line starts with an `*`.',
-      url: 'https://github.com/gajus/eslint-plugin-jsdoc/blob/main/docs/rules/require-asterisk-prefix.md#repos-sticky-header',
-    },
-    fixable: 'code',
-    schema: [
-      {
-        enum: [
-          'always', 'never', 'any',
-        ],
-        type: 'string',
       },
-      {
-        additionalProperties: false,
-        properties: {
-          tags: {
-            properties: {
-              always: {
-                items: {
-                  type: 'string',
-                },
-                type: 'array',
-              },
-              any: {
-                items: {
-                  type: 'string',
-                },
-                type: 'array',
-              },
-              never: {
-                items: {
-                  type: 'string',
-                },
-                type: 'array',
-              },
-            },
-            type: 'object',
-          },
-        },
-        type: 'object',
-      },
-    ],
-    type: 'layout',
+    );
   },
-});
+  {
+    iterateAllJsdocs: true,
+    meta: {
+      docs: {
+        description: "Requires that each JSDoc line starts with an `*`.",
+        url: "https://github.com/gajus/eslint-plugin-jsdoc/blob/main/docs/rules/require-asterisk-prefix.md#repos-sticky-header",
+      },
+      fixable: "code",
+      schema: [
+        {
+          enum: ["always", "never", "any"],
+          type: "string",
+        },
+        {
+          additionalProperties: false,
+          properties: {
+            tags: {
+              properties: {
+                always: {
+                  items: {
+                    type: "string",
+                  },
+                  type: "array",
+                },
+                any: {
+                  items: {
+                    type: "string",
+                  },
+                  type: "array",
+                },
+                never: {
+                  items: {
+                    type: "string",
+                  },
+                  type: "array",
+                },
+              },
+              type: "object",
+            },
+          },
+          type: "object",
+        },
+      ],
+      type: "layout",
+    },
+  },
+);

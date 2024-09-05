@@ -1,178 +1,162 @@
-import iterateJsdoc from '../iterateJsdoc.js';
+import iterateJsdoc from "../iterateJsdoc.js";
 
-export default iterateJsdoc(({
-  sourceCode,
-  utils,
-  report,
-  context,
-  jsdoc,
-  jsdocNode,
-}) => {
-  const [
-    mainCircumstance,
-    {
-      tags = null,
-    } = {},
-  ] = context.options;
+/**
+ * Type for tags configuration in options
+ */
+type TagsConfig = null | "any" | Record<string, "always" | "never">;
 
-  const tgs = /**
-               * @type {null|"any"|{[key: string]: "always"|"never"}}
-               */ (tags);
+export default iterateJsdoc(
+  ({ sourceCode, utils, report, context, jsdoc, jsdocNode }) => {
+    const [mainCircumstance, { tags = null as TagsConfig } = {}] =
+      context.options;
 
-  /**
-   * @param {import('@es-joy/jsdoccomment').JsdocTagWithInline} jsdocTag
-   * @param {string} targetTagName
-   * @param {"always"|"never"} [circumstance]
-   * @returns {void}
-   */
-  const checkHyphens = (jsdocTag, targetTagName, circumstance = mainCircumstance) => {
-    const always = !circumstance || circumstance === 'always';
-    const desc = /** @type {string} */ (utils.getTagDescription(jsdocTag));
-    if (!desc.trim()) {
-      return;
-    }
+    /**
+     * Checks if the description of a JSDoc tag starts with a hyphen, based on the given circumstance
+     *
+     * @param jsdocTag - JSDoc tag object
+     * @param targetTagName - Target tag name
+     * @param circumstance - Circumstance to check for ("always" or "never")
+     */
+    const checkHyphens = (
+      jsdocTag: import("@es-joy/jsdoccomment").JsdocTagWithInline,
+      targetTagName: string,
+      circumstance: "always" | "never" = mainCircumstance as "always" | "never",
+    ): void => {
+      const always = !circumstance || circumstance === "always";
+      const desc = utils.getTagDescription(jsdocTag).trim();
 
-    const startsWithHyphen = (/^\s*-/u).test(desc);
-    if (always) {
-      if (!startsWithHyphen) {
-        report(`There must be a hyphen before @${targetTagName} description.`, (fixer) => {
-          const lineIndex = /** @type {import('../iterateJsdoc.js').Integer} */ (
-            jsdocTag.line
-          );
-          const sourceLines = sourceCode.getText(jsdocNode).split('\n');
-
-          // Get start index of description, accounting for multi-line descriptions
-          const description = desc.split('\n')[0];
-          const descriptionIndex = sourceLines[lineIndex].lastIndexOf(description);
-
-          const replacementLine = sourceLines[lineIndex]
-            .slice(0, descriptionIndex) + '- ' + description;
-          sourceLines.splice(lineIndex, 1, replacementLine);
-          const replacement = sourceLines.join('\n');
-
-          return fixer.replaceText(jsdocNode, replacement);
-        }, jsdocTag);
-      }
-    } else if (startsWithHyphen) {
-      let lines = 0;
-      for (const {
-        tokens,
-      } of jsdocTag.source) {
-        if (tokens.description) {
-          break;
-        }
-
-        lines++;
+      if (!desc) {
+        return;
       }
 
-      utils.reportJSDoc(
-        `There must be no hyphen before @${targetTagName} description.`,
-        {
-          line: jsdocTag.source[0].number + lines,
-        },
-        () => {
-          for (const {
-            tokens,
-          } of jsdocTag.source) {
-            if (tokens.description) {
-              tokens.description = tokens.description.replace(
-                /^\s*-\s*/u, '',
-              );
-              break;
-            }
-          }
-        },
-        true,
-      );
-    }
-  };
+      const startsWithHyphen = /^\s*-/.test(desc);
 
-  utils.forEachPreferredTag('param', checkHyphens);
-  if (tgs) {
-    const tagEntries = Object.entries(tgs);
-    for (const [
-      tagName,
-      circumstance,
-    ] of tagEntries) {
-      if (tagName === '*') {
-        const preferredParamTag = utils.getPreferredTagName({
-          tagName: 'param',
-        });
-        for (const {
-          tag,
-        } of jsdoc.tags) {
-          if (tag === preferredParamTag || tagEntries.some(([
-            tagNme,
-          ]) => {
-            return tagNme !== '*' && tagNme === tag;
-          })) {
-            continue;
-          }
+      if (always && !startsWithHyphen) {
+        report(
+          `There must be a hyphen before @${targetTagName} description.`,
+          (fixer) => {
+            const lineIndex = jsdocTag.line;
+            const sourceLines = sourceCode.getText(jsdocNode).split("\n");
+            const description = desc.split("\n")[0];
+            const descriptionIndex =
+              sourceLines[lineIndex].lastIndexOf(description);
 
-          utils.forEachPreferredTag(tag, (jsdocTag, targetTagName) => {
-            checkHyphens(
-              jsdocTag,
-              targetTagName,
-              /** @type {"always"|"never"} */ (circumstance),
-            );
-          });
-        }
+            const replacementLine =
+              sourceLines[lineIndex].slice(0, descriptionIndex) +
+              "- " +
+              description;
+            sourceLines.splice(lineIndex, 1, replacementLine);
+            const replacement = sourceLines.join("\n");
 
-        continue;
-      }
-
-      utils.forEachPreferredTag(tagName, (jsdocTag, targetTagName) => {
-        checkHyphens(
-          jsdocTag,
-          targetTagName,
-          /** @type {"always"|"never"} */ (circumstance),
-        );
-      });
-    }
-  }
-}, {
-  iterateAllJsdocs: true,
-  meta: {
-    docs: {
-      description: 'Requires a hyphen before the `@param` description.',
-      url: 'https://github.com/gajus/eslint-plugin-jsdoc/blob/main/docs/rules/require-hyphen-before-param-description.md#repos-sticky-header',
-    },
-    fixable: 'code',
-    schema: [
-      {
-        enum: [
-          'always', 'never',
-        ],
-        type: 'string',
-      },
-      {
-        additionalProperties: false,
-        properties: {
-          tags: {
-            anyOf: [
-              {
-                patternProperties: {
-                  '.*': {
-                    enum: [
-                      'always', 'never',
-                    ],
-                    type: 'string',
-                  },
-                },
-                type: 'object',
-              },
-              {
-                enum: [
-                  'any',
-                ],
-                type: 'string',
-              },
-            ],
+            return fixer.replaceText(jsdocNode, replacement);
           },
-        },
-        type: 'object',
-      },
-    ],
-    type: 'layout',
+          jsdocTag,
+        );
+      } else if (!always && startsWithHyphen) {
+        let lines = 0;
+        for (const { tokens } of jsdocTag.source) {
+          if (tokens.description) {
+            break;
+          }
+          lines++;
+        }
+
+        utils.reportJSDoc(
+          `There must be no hyphen before @${targetTagName} description.`,
+          {
+            line: jsdocTag.source[0].number + lines,
+          },
+          () => {
+            for (const { tokens } of jsdocTag.source) {
+              if (tokens.description) {
+                tokens.description = tokens.description.replace(/^\s*-\s*/, "");
+                break;
+              }
+            }
+          },
+          true,
+        );
+      }
+    };
+
+    // Apply check for "param" tags
+    utils.forEachPreferredTag("param", checkHyphens);
+
+    // Apply check for other tags if provided in config
+    if (tags) {
+      const tagEntries = Object.entries(tags);
+      for (const [tagName, circumstance] of tagEntries) {
+        if (tagName === "*") {
+          const preferredParamTag = utils.getPreferredTagName({
+            tagName: "param",
+          });
+          for (const { tag } of jsdoc.tags) {
+            if (
+              tag === preferredParamTag ||
+              tagEntries.some(([tagNme]) => tagNme !== "*" && tagNme === tag)
+            ) {
+              continue;
+            }
+
+            utils.forEachPreferredTag(tag, (jsdocTag, targetTagName) => {
+              checkHyphens(
+                jsdocTag,
+                targetTagName,
+                circumstance as "always" | "never",
+              );
+            });
+          }
+          continue;
+        }
+
+        utils.forEachPreferredTag(tagName, (jsdocTag, targetTagName) => {
+          checkHyphens(
+            jsdocTag,
+            targetTagName,
+            circumstance as "always" | "never",
+          );
+        });
+      }
+    }
   },
-});
+  {
+    iterateAllJsdocs: true,
+    meta: {
+      docs: {
+        description: "Requires a hyphen before the `@param` description.",
+        url: "https://github.com/gajus/eslint-plugin-jsdoc/blob/main/docs/rules/require-hyphen-before-param-description.md#repos-sticky-header",
+      },
+      fixable: "code",
+      schema: [
+        {
+          enum: ["always", "never"],
+          type: "string",
+        },
+        {
+          additionalProperties: false,
+          properties: {
+            tags: {
+              anyOf: [
+                {
+                  patternProperties: {
+                    ".*": {
+                      enum: ["always", "never"],
+                      type: "string",
+                    },
+                  },
+                  type: "object",
+                },
+                {
+                  enum: ["any"],
+                  type: "string",
+                },
+              ],
+            },
+          },
+          type: "object",
+        },
+      ],
+      type: "layout",
+    },
+  },
+);

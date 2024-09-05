@@ -1,25 +1,23 @@
 // Todo: Support TS by fenced block type
 
-import {readFileSync} from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import * as espree from 'espree';
+import { parseComment } from "@es-joy/jsdoccomment";
+import { Linter } from "eslint";
+import * as espree from "espree";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
-  getRegexFromString,
   forEachPreferredTag,
-  getTagDescription,
   getPreferredTagName,
+  getRegexFromString,
+  getTagDescription,
   hasTag,
-} from './jsdocUtils.js';
-import {
-  parseComment,
-} from '@es-joy/jsdoccomment';
+} from "./jsdocUtils.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const {version} = JSON.parse(
-  // @ts-expect-error `Buffer` is ok for `JSON.parse`
-  readFileSync(join(__dirname, '../package.json'))
+const { version } = JSON.parse(
+  readFileSync(join(__dirname, "../package.json"), "utf-8"),
 );
 
 // const zeroBasedLineIndexAdjust = -1;
@@ -31,70 +29,46 @@ const firstLinePrefixLength = preTagSpaceLength;
 
 const hasCaptionRegex = /^\s*<caption>([\s\S]*?)<\/caption>/u;
 
-/**
- * @param {string} str
- * @returns {string}
- */
-const escapeStringRegexp = (str) => {
-  return str.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+const escapeStringRegexp = (str: string): string => {
+  return str.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 };
 
-/**
- * @param {string} str
- * @param {string} ch
- * @returns {import('./iterateJsdoc.js').Integer}
- */
-const countChars = (str, ch) => {
-  return (str.match(new RegExp(escapeStringRegexp(ch), 'gu')) || []).length;
+const countChars = (str: string, ch: string): number => {
+  return (str.match(new RegExp(escapeStringRegexp(ch), "gu")) || []).length;
 };
 
-/**
- * @param {string} text
- * @returns {[
-*   import('./iterateJsdoc.js').Integer,
-*   import('./iterateJsdoc.js').Integer
-* ]}
-*/
-const getLinesCols = (text) => {
- const matchLines = countChars(text, '\n');
+const getLinesCols = (text: string): [number, number] => {
+  const matchLines = countChars(text, "\n");
 
- const colDelta = matchLines ?
-   text.slice(text.lastIndexOf('\n') + 1).length :
-   text.length;
+  const colDelta = matchLines
+    ? text.slice(text.lastIndexOf("\n") + 1).length
+    : text.length;
 
- return [
-   matchLines, colDelta,
- ];
+  return [matchLines, colDelta];
 };
 
-/**
- * @typedef {number} Integer
- */
+type Integer = number;
 
-/**
- * @typedef {object} JsdocProcessorOptions
- * @property {boolean} [captionRequired]
- * @property {Integer} [paddedIndent]
- * @property {boolean} [checkDefaults]
- * @property {boolean} [checkParams]
- * @property {boolean} [checkExamples]
- * @property {boolean} [checkProperties]
- * @property {string} [matchingFileName]
- * @property {string} [matchingFileNameDefaults]
- * @property {string} [matchingFileNameParams]
- * @property {string} [matchingFileNameProperties]
- * @property {string} [exampleCodeRegex]
- * @property {string} [rejectExampleCodeRegex]
- * @property {"script"|"module"} [sourceType]
- * @property {import('eslint').Linter.ESTreeParser|import('eslint').Linter.NonESTreeParser} [parser]
- */
+interface JsdocProcessorOptions {
+  captionRequired?: boolean;
+  paddedIndent?: Integer;
+  checkDefaults?: boolean;
+  checkParams?: boolean;
+  checkExamples?: boolean;
+  checkProperties?: boolean;
+  matchingFileName?: string;
+  matchingFileNameDefaults?: string;
+  matchingFileNameParams?: string;
+  matchingFileNameProperties?: string;
+  exampleCodeRegex?: string;
+  rejectExampleCodeRegex?: string;
+  sourceType?: "script" | "module";
+  parser?: Linter.ESTreeParser | Linter.NonESTreeParser;
+}
 
-/**
- * We use a function for the ability of the user to pass in a config, but
- * without requiring all users of the plugin to do so.
- * @param {JsdocProcessorOptions} [options]
- */
-export const getJsdocProcessorPlugin = (options = {}) => {
+export const getJsdocProcessorPlugin = (
+  options: JsdocProcessorOptions = {},
+) => {
   const {
     exampleCodeRegex = null,
     rejectExampleCodeRegex = null,
@@ -108,14 +82,12 @@ export const getJsdocProcessorPlugin = (options = {}) => {
     matchingFileNameProperties = null,
     paddedIndent = 0,
     captionRequired = false,
-    sourceType = 'module',
-    parser = undefined
+    sourceType = "module",
+    parser = undefined,
   } = options;
 
-  /** @type {RegExp} */
-  let exampleCodeRegExp;
-  /** @type {RegExp} */
-  let rejectExampleCodeRegExp;
+  let exampleCodeRegExp: RegExp | undefined;
+  let rejectExampleCodeRegExp: RegExp | undefined;
 
   if (exampleCodeRegex) {
     exampleCodeRegExp = getRegexFromString(exampleCodeRegex);
@@ -125,58 +97,27 @@ export const getJsdocProcessorPlugin = (options = {}) => {
     rejectExampleCodeRegExp = getRegexFromString(rejectExampleCodeRegex);
   }
 
-  /**
-   * @type {{
-   *   targetTagName: string,
-   *   ext: string,
-   *   codeStartLine: number,
-   *   codeStartCol: number,
-   *   nonJSPrefacingCols: number,
-   *   commentLineCols: [number, number]
-   * }[]}
-   */
-  const otherInfo = [];
+  const otherInfo: {
+    targetTagName: string;
+    ext: string;
+    codeStartLine: number;
+    codeStartCol: number;
+    nonJSPrefacingCols: number;
+    commentLineCols: [number, number];
+  }[] = [];
 
-  /** @type {import('eslint').Linter.LintMessage[]} */
-  let extraMessages = [];
+  let extraMessages: Linter.LintMessage[] = [];
 
-  /**
-   * @param {import('./iterateJsdoc.js').JsdocBlockWithInline} jsdoc
-   * @param {string} jsFileName
-   * @param {[number, number]} commentLineCols
-   */
-  const getTextsAndFileNames = (jsdoc, jsFileName, commentLineCols) => {
-    /**
-     * @type {{
-     *   text: string,
-     *   filename: string|null|undefined
-     * }[]}
-     */
-    const textsAndFileNames = [];
+  const getTextsAndFileNames = (
+    jsdoc: any, // Replace with appropriate type
+    jsFileName: string,
+    commentLineCols: [number, number],
+  ): { text: string; filename: string | null | undefined }[] => {
+    const textsAndFileNames: {
+      text: string;
+      filename: string | null | undefined;
+    }[] = [];
 
-    /**
-     * @param {{
-     *   filename: string|null,
-     *   defaultFileName: string|undefined,
-     *   source: string,
-     *   targetTagName: string,
-     *   rules?: import('eslint').Linter.RulesRecord|undefined,
-     *   lines?: import('./iterateJsdoc.js').Integer,
-     *   cols?: import('./iterateJsdoc.js').Integer,
-     *   skipInit?: boolean,
-     *   ext: string,
-     *   sources?: {
-     *     nonJSPrefacingCols: import('./iterateJsdoc.js').Integer,
-     *     nonJSPrefacingLines: import('./iterateJsdoc.js').Integer,
-     *     string: string,
-     *   }[],
-     *   tag?: import('comment-parser').Spec & {
-     *     line?: import('./iterateJsdoc.js').Integer,
-     *   }|{
-     *     line: import('./iterateJsdoc.js').Integer,
-     *   }
-     * }} cfg
-     */
     const checkSource = ({
       filename,
       ext,
@@ -190,6 +131,21 @@ export const getJsdocProcessorPlugin = (options = {}) => {
       tag = {
         line: 0,
       },
+    }: {
+      filename: string | null;
+      ext: string;
+      defaultFileName: string | undefined;
+      lines?: Integer;
+      cols?: Integer;
+      skipInit?: boolean;
+      source: string;
+      targetTagName: string;
+      sources?: {
+        nonJSPrefacingCols: Integer;
+        nonJSPrefacingLines: Integer;
+        string: string;
+      }[];
+      tag: { line: Integer };
     }) => {
       if (!skipInit) {
         sources.push({
@@ -199,35 +155,29 @@ export const getJsdocProcessorPlugin = (options = {}) => {
         });
       }
 
-      /**
-       * @param {{
-       *   nonJSPrefacingCols: import('./iterateJsdoc.js').Integer,
-       *   nonJSPrefacingLines: import('./iterateJsdoc.js').Integer,
-       *   string: string
-       * }} cfg
-       */
-      const addSourceInfo = function ({
+      const addSourceInfo = ({
         nonJSPrefacingCols,
         nonJSPrefacingLines,
         string,
-      }) {
-        const src = paddedIndent ?
-          string.replaceAll(new RegExp(`(^|\n) {${paddedIndent}}(?!$)`, 'gu'), '\n') :
-          string;
+      }: {
+        nonJSPrefacingCols: Integer;
+        nonJSPrefacingLines: Integer;
+        string: string;
+      }) => {
+        const src = paddedIndent
+          ? string.replace(
+              new RegExp(`(^|\n) {${paddedIndent}}(?!$)`, "gu"),
+              "\n",
+            )
+          : string;
 
-        // Programmatic ESLint API: https://eslint.org/docs/developer-guide/nodejs-api
         const file = filename || defaultFileName;
 
-        if (!('line' in tag)) {
+        if (!("line" in tag)) {
           tag.line = tag.source[0].number;
         }
 
-        // NOTE: `tag.line` can be 0 if of form `/** @tag ... */`
-        const codeStartLine = /**
-                               * @type {import('comment-parser').Spec & {
-                               *     line: import('./iterateJsdoc.js').Integer,
-                               * }}
-                               */ (tag).line + nonJSPrefacingLines;
+        const codeStartLine = tag.line + nonJSPrefacingLines;
         const codeStartCol = likelyNestedJSDocIndentSpace;
 
         textsAndFileNames.push({
@@ -240,7 +190,7 @@ export const getJsdocProcessorPlugin = (options = {}) => {
           codeStartLine,
           codeStartCol,
           nonJSPrefacingCols,
-          commentLineCols
+          commentLineCols,
         });
       };
 
@@ -249,22 +199,17 @@ export const getJsdocProcessorPlugin = (options = {}) => {
       }
     };
 
-    /**
-     *
-     * @param {string|null} filename
-     * @param {string} [ext] Since `eslint-plugin-markdown` v2, and
-     *   ESLint 7, this is the default which other JS-fenced rules will used.
-     *   Formerly "md" was the default.
-     * @returns {{
-     *   defaultFileName: string|undefined,
-     *   filename: string|null,
-     *   ext: string
-     * }}
-     */
-    const getFilenameInfo = (filename, ext = 'md/*.js') => {
+    const getFilenameInfo = (
+      filename: string | null,
+      ext = "md/*.js",
+    ): {
+      defaultFileName: string | undefined;
+      filename: string | null;
+      ext: string;
+    } => {
       let defaultFileName;
       if (!filename) {
-        if (typeof jsFileName === 'string' && jsFileName.includes('.')) {
+        if (typeof jsFileName === "string" && jsFileName.includes(".")) {
           defaultFileName = jsFileName.replace(/\.[^.]*$/u, `.${ext}`);
         } else {
           defaultFileName = `dummy.${ext}`;
@@ -279,8 +224,11 @@ export const getJsdocProcessorPlugin = (options = {}) => {
     };
 
     if (checkDefaults) {
-      const filenameInfo = getFilenameInfo(matchingFileNameDefaults, 'jsdoc-defaults');
-      forEachPreferredTag(jsdoc, 'default', (tag, targetTagName) => {
+      const filenameInfo = getFilenameInfo(
+        matchingFileNameDefaults,
+        "jsdoc-defaults",
+      );
+      forEachPreferredTag(jsdoc, "default", (tag, targetTagName) => {
         if (!tag.description.trim()) {
           return;
         }
@@ -294,8 +242,11 @@ export const getJsdocProcessorPlugin = (options = {}) => {
     }
 
     if (checkParams) {
-      const filenameInfo = getFilenameInfo(matchingFileNameParams, 'jsdoc-params');
-      forEachPreferredTag(jsdoc, 'param', (tag, targetTagName) => {
+      const filenameInfo = getFilenameInfo(
+        matchingFileNameParams,
+        "jsdoc-params",
+      );
+      forEachPreferredTag(jsdoc, "param", (tag, targetTagName) => {
         if (!tag.default || !tag.default.trim()) {
           return;
         }
@@ -309,8 +260,11 @@ export const getJsdocProcessorPlugin = (options = {}) => {
     }
 
     if (checkProperties) {
-      const filenameInfo = getFilenameInfo(matchingFileNameProperties, 'jsdoc-properties');
-      forEachPreferredTag(jsdoc, 'property', (tag, targetTagName) => {
+      const filenameInfo = getFilenameInfo(
+        matchingFileNameProperties,
+        "jsdoc-properties",
+      );
+      forEachPreferredTag(jsdoc, "property", (tag, targetTagName) => {
         if (!tag.default || !tag.default.trim()) {
           return;
         }
@@ -327,17 +281,17 @@ export const getJsdocProcessorPlugin = (options = {}) => {
       return textsAndFileNames;
     }
 
-    const tagName = /** @type {string} */ (getPreferredTagName(jsdoc, {
-      tagName: 'example',
-    }));
+    const tagName = getPreferredTagName(jsdoc, {
+      tagName: "example",
+    });
     if (!hasTag(jsdoc, tagName)) {
       return textsAndFileNames;
     }
 
     const matchingFilenameInfo = getFilenameInfo(matchingFileName);
 
-    forEachPreferredTag(jsdoc, 'example', (tag, targetTagName) => {
-      let source = /** @type {string} */ (getTagDescription(tag));
+    forEachPreferredTag(jsdoc, "example", (tag, targetTagName) => {
+      let source = getTagDescription(tag);
       const match = source.match(hasCaptionRegex);
 
       if (captionRequired && (!match || !match[1].trim())) {
@@ -346,26 +300,26 @@ export const getJsdocProcessorPlugin = (options = {}) => {
           column: commentLineCols[1] + 1,
           severity: 2,
           message: `@${targetTagName} error - Caption is expected for examples.`,
-          ruleId: 'jsdoc/example-missing-caption'
+          ruleId: "jsdoc/example-missing-caption",
         });
         return;
       }
 
-      source = source.replace(hasCaptionRegex, '');
-      const [
-        lines,
-        cols,
-      ] = match ? getLinesCols(match[0]) : [
-        0, 0,
-      ];
+      source = source.replace(hasCaptionRegex, "");
+      const [lines, cols] = match ? getLinesCols(match[0]) : [0, 0];
 
-      if (exampleCodeRegex && !exampleCodeRegExp.test(source) ||
-        rejectExampleCodeRegex && rejectExampleCodeRegExp.test(source)
+      if (
+        (exampleCodeRegex && !exampleCodeRegExp?.test(source)) ||
+        (rejectExampleCodeRegex && rejectExampleCodeRegExp?.test(source))
       ) {
         return;
       }
 
-      const sources = [];
+      const sources: {
+        nonJSPrefacingCols: Integer;
+        nonJSPrefacingLines: Integer;
+        string: string;
+      }[] = [];
       let skipInit = false;
       if (exampleCodeRegex) {
         let nonJSPrefacingCols = 0;
@@ -375,39 +329,32 @@ export const getJsdocProcessorPlugin = (options = {}) => {
         let lastStringCount = 0;
 
         let exampleCode;
-        exampleCodeRegExp.lastIndex = 0;
-        while ((exampleCode = exampleCodeRegExp.exec(source)) !== null) {
-          const {
-            index,
-            '0': n0,
-            '1': n1,
-          } = exampleCode;
+        exampleCodeRegExp!.lastIndex = 0;
+        while ((exampleCode = exampleCodeRegExp!.exec(source)) !== null) {
+          const { index, "0": n0, "1": n1 } = exampleCode;
 
-          // Count anything preceding user regex match (can affect line numbering)
           const preMatch = source.slice(startingIndex, index);
 
-          const [
-            preMatchLines,
-            colDelta,
-          ] = getLinesCols(preMatch);
+          const [preMatchLines, colDelta] = getLinesCols(preMatch);
 
           let nonJSPreface;
           let nonJSPrefaceLineCount;
           if (n1) {
             const idx = n0.indexOf(n1);
             nonJSPreface = n0.slice(0, idx);
-            nonJSPrefaceLineCount = countChars(nonJSPreface, '\n');
+            nonJSPrefaceLineCount = countChars(nonJSPreface, "\n");
           } else {
-            nonJSPreface = '';
+            nonJSPreface = "";
             nonJSPrefaceLineCount = 0;
           }
 
-          nonJSPrefacingLines += lastStringCount + preMatchLines + nonJSPrefaceLineCount;
+          nonJSPrefacingLines +=
+            lastStringCount + preMatchLines + nonJSPrefaceLineCount;
 
-          // Ignore `preMatch` delta if newlines here
           if (nonJSPrefaceLineCount) {
-            const charsInLastLine = nonJSPreface.slice(nonJSPreface.lastIndexOf('\n') + 1).length;
-
+            const charsInLastLine = nonJSPreface.slice(
+              nonJSPreface.lastIndexOf("\n") + 1,
+            ).length;
             nonJSPrefacingCols += charsInLastLine;
           } else {
             nonJSPrefacingCols += colDelta + nonJSPreface.length;
@@ -419,9 +366,9 @@ export const getJsdocProcessorPlugin = (options = {}) => {
             nonJSPrefacingLines,
             string,
           });
-          startingIndex = exampleCodeRegExp.lastIndex;
-          lastStringCount = countChars(string, '\n');
-          if (!exampleCodeRegExp.global) {
+          startingIndex = exampleCodeRegExp!.lastIndex;
+          lastStringCount = countChars(string, "\n");
+          if (!exampleCodeRegExp!.global) {
             break;
           }
         }
@@ -444,118 +391,73 @@ export const getJsdocProcessorPlugin = (options = {}) => {
     return textsAndFileNames;
   };
 
-  // See https://eslint.org/docs/latest/extend/plugins#processors-in-plugins
-  // See https://eslint.org/docs/latest/extend/custom-processors
-  // From https://github.com/eslint/eslint/issues/14745#issuecomment-869457265
-  /*
-    {
-      "files": ["*.js", "*.ts"],
-      "processor": "jsdoc/example" // a pretended value here
-    },
-    {
-      "files": [
-        "*.js/*_jsdoc-example.js",
-        "*.ts/*_jsdoc-example.js",
-        "*.js/*_jsdoc-example.ts"
-      ],
-      "rules": {
-        // specific rules for examples in jsdoc only here
-        // And other rules for `.js` and `.ts` will also be enabled for them
-      }
-    }
-  */
   return {
     meta: {
-      name: 'eslint-plugin-jsdoc/processor',
+      name: "eslint-plugin-jsdoc/processor",
       version,
     },
     processors: {
       examples: {
         meta: {
-          name: 'eslint-plugin-jsdoc/preprocessor',
+          name: "eslint-plugin-jsdoc/preprocessor",
           version,
         },
-        /**
-         * @param {string} text
-         * @param {string} filename
-         */
-        preprocess (text, filename) {
+        preprocess(text: string, filename: string) {
           try {
             let ast;
 
-            // May be running a second time so catch and ignore
             try {
               ast = parser
-                // @ts-expect-error Should be present
                 ? parser.parseForESLint(text, {
-                  ecmaVersion: 'latest',
-                  sourceType,
-                  comment: true
-                }).ast
+                    ecmaVersion: "latest",
+                    sourceType,
+                    comment: true,
+                  }).ast
                 : espree.parse(text, {
-                  ecmaVersion: 'latest',
-                  sourceType,
-                  comment: true
-                });
+                    ecmaVersion: "latest",
+                    sourceType,
+                    comment: true,
+                  });
             } catch (err) {
               return [text];
             }
 
-            /** @type {[number, number][]} */
-            const commentLineCols = [];
-            const jsdocComments = /** @type {import('estree').Comment[]} */ (
-              /**
-               * @type {import('estree').Program & {
-               *   comments?: import('estree').Comment[]
-               * }}
-               */
-              (ast).comments
-            ).filter((comment) => {
-              return (/^\*\s/u).test(comment.value);
-            }).map((comment) => {
-              /* c8 ignore next -- Unsupporting processors only? */
-              const [start] = comment.range ?? [];
-              const textToStart = text.slice(0, start);
+            const commentLineCols: [number, number][] = [];
+            const jsdocComments = (ast.comments ?? [])
+              .filter((comment) => /^\*\s/u.test(comment.value))
+              .map((comment) => {
+                const [start] = comment.range ?? [];
+                const textToStart = text.slice(0, start);
 
-              const [lines, cols] = getLinesCols(textToStart);
-
-              // const lines = [...textToStart.matchAll(/\n/gu)].length
-              // const lastLinePos = textToStart.lastIndexOf('\n');
-              // const cols = lastLinePos === -1
-              //   ? 0
-              //   : textToStart.slice(lastLinePos).length;
-              commentLineCols.push([lines, cols]);
-              return parseComment(comment);
-            });
+                const [lines, cols] = getLinesCols(textToStart);
+                commentLineCols.push([lines, cols]);
+                return parseComment(comment);
+              });
 
             return [
               text,
-              ...jsdocComments.flatMap((jsdoc, idx) => {
-                return getTextsAndFileNames(
-                  jsdoc,
-                  filename,
-                  commentLineCols[idx]
-                );
-              }).filter(Boolean)
+              ...jsdocComments
+                .flatMap((jsdoc, idx) =>
+                  getTextsAndFileNames(jsdoc, filename, commentLineCols[idx]),
+                )
+                .filter(Boolean),
             ];
-          /* c8 ignore next 3 */
           } catch (err) {
-            console.log('err', filename, err);
+            console.log("err", filename, err);
           }
         },
 
-        /**
-         * @param {import('eslint').Linter.LintMessage[][]} messages
-         * @param {string} filename
-         */
-        postprocess ([jsMessages, ...messages], filename) {
+        postprocess(
+          [jsMessages, ...messages]: Linter.LintMessage[][],
+          filename: string,
+        ) {
           messages.forEach((message, idx) => {
             const {
               targetTagName,
               codeStartLine,
               codeStartCol,
               nonJSPrefacingCols,
-              commentLineCols
+              commentLineCols,
             } = otherInfo[idx];
 
             message.forEach((msg) => {
@@ -568,30 +470,34 @@ export const getJsdocProcessorPlugin = (options = {}) => {
                 column,
                 endColumn,
                 endLine,
-
-                // Todo: Make fixable
-                // fix
-                // fix: {range: [number, number], text: string}
-                // suggestions: {desc: , messageId:, fix: }[],
               } = msg;
 
               const [codeCtxLine, codeCtxColumn] = commentLineCols;
               const startLine = codeCtxLine + codeStartLine + line;
-              const startCol = 1 + // Seems to need one more now
-                codeCtxColumn + codeStartCol + (
-                  // This might not work for line 0, but line 0 is unlikely for examples
-                  line <= 1 ? nonJSPrefacingCols + firstLinePrefixLength : preTagSpaceLength
-                ) + column;
+              const startCol =
+                1 +
+                codeCtxColumn +
+                codeStartCol +
+                (line <= 1
+                  ? nonJSPrefacingCols + firstLinePrefixLength
+                  : preTagSpaceLength) +
+                column;
 
-              msg.message = '@' + targetTagName + ' ' + (severity === 2 ? 'error' : 'warning') +
-                (ruleId ? ' (' + ruleId + ')' : '') + ': ' +
-                (fatal ? 'Fatal: ' : '') +
+              msg.message =
+                "@" +
+                targetTagName +
+                " " +
+                (severity === 2 ? "error" : "warning") +
+                (ruleId ? " (" + ruleId + ")" : "") +
+                ": " +
+                (fatal ? "Fatal: " : "") +
                 message;
               msg.line = startLine;
               msg.column = startCol;
               msg.endLine = endLine ? startLine + endLine : startLine;
-              // added `- column` to offset what `endColumn` already seemed to include
-              msg.endColumn = endColumn ? startCol - column + endColumn : startCol;
+              msg.endColumn = endColumn
+                ? startCol - column + endColumn
+                : startCol;
             });
           });
 
@@ -599,7 +505,7 @@ export const getJsdocProcessorPlugin = (options = {}) => {
           extraMessages = [];
           return ret;
         },
-        supportsAutofix: true
+        supportsAutofix: true,
       },
     },
   };

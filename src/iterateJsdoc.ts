@@ -10,27 +10,21 @@ import {
 } from 'comment-parser';
 import esquery from 'esquery';
 
-/**
- * @typedef {number} Integer
- */
+type Integer = number;
 
-/**
- * @typedef {import('@es-joy/jsdoccomment').JsdocBlockWithInline} JsdocBlockWithInline
- */
+type JsdocBlockWithInline = import('@es-joy/jsdoccomment').JsdocBlockWithInline;
 
-/**
- * @typedef {{
- *   disallowName?: string,
- *   allowName?: string,
- *   context?: string,
- *   comment?: string,
- *   tags?: string[],
- *   replacement?: string,
- *   minimum?: Integer,
- *   message?: string,
- *   forceRequireReturn?: boolean
- * }} ContextObject
- */
+type ContextObject = {
+  disallowName?: string;
+  allowName?: string;
+  context?: string;
+  comment?: string;
+  tags?: string[];
+  replacement?: string;
+  minimum?: Integer;
+  message?: string;
+  forceRequireReturn?: boolean;
+};
 /**
  * @typedef {string|ContextObject} Context
  */
@@ -85,15 +79,13 @@ import esquery from 'esquery';
  * }}
  */
 
-/**
- * @typedef {{
- *   forEachPreferredTag: ForEachPreferredTag,
- *   reportSettings: ReportSettings,
- *   parseClosureTemplateTag: ParseClosureTemplateTag,
- *   getPreferredTagNameObject: GetPreferredTagNameObject,
- *   pathDoesNotBeginWith: import('./jsdocUtils.js').PathDoesNotBeginWith
- * }} BasicUtils
- */
+type BasicUtils = {
+  forEachPreferredTag: ForEachPreferredTag;
+  reportSettings: ReportSettings;
+  parseClosureTemplateTag: ParseClosureTemplateTag;
+  getPreferredTagNameObject: GetPreferredTagNameObject;
+  pathDoesNotBeginWith: import('./jsdocUtils.js').PathDoesNotBeginWith;
+};
 
 /**
  * @callback IsIteratingFunction
